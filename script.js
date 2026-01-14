@@ -4,28 +4,31 @@ const ctx = canvas.getContext("2d");
 canvas.width = 400;
 canvas.height = 600;
 
-// Game Variables
 let score = 0;
 let gravity = 0.5;
 let isGameOver = false;
 
 const player = {
     x: 200,
-    y: 500,
+    y: 300,
     width: 30,
     height: 30,
-    dy: 0,        // Vertical Velocity
+    dy: 0,
     jumpForce: -12,
-    speed: 5
+    speed: 6,
+    onGround: false // Газар дээр байгаа эсэхийг шалгах
 };
 
-// Simple Platform Object
-const platforms = [
-    { x: 150, y: 550, width: 100, height: 10 },
-    { x: 50, y: 400, width: 100, height: 10 },
-    { x: 250, y: 250, width: 100, height: 10 },
-    { x: 100, y: 100, width: 100, height: 10 }
-];
+// Анхны тавцангууд
+let platforms = [];
+for (let i = 0; i < 6; i++) {
+    platforms.push({
+        x: Math.random() * (canvas.width - 80),
+        y: i * 100,
+        width: 80,
+        height: 10
+    });
+}
 
 const keys = {};
 window.addEventListener("keydown", e => keys[e.code] = true);
@@ -34,50 +37,84 @@ window.addEventListener("keyup", e => keys[e.code] = false);
 function update() {
     if (isGameOver) return;
 
-    // Left/Right Movement
+    // Зүүн, баруун хөдөлгөөн
     if (keys["ArrowLeft"]) player.x -= player.speed;
     if (keys["ArrowRight"]) player.x += player.speed;
 
-    // Apply Gravity
+    // Гравитаци (Доошоо татах)
     player.dy += gravity;
     player.y += player.dy;
 
-    // Platform Collision
+    // Дээшээ үсрэх товчлуур (Space эсвэл W)
+    // Зөвхөн тавцан дээр буусан үед үсрэхийг зөвшөөрнө
+    if ((keys["Space"] || keys["KeyW"] || keys["ArrowUp"]) && player.onGround) {
+        player.dy = player.jumpForce;
+        player.onGround = false;
+    }
+
+    player.onGround = false; // Шалгахаас өмнө reset хийнэ
+
+    // Тавцан дээр буух болон Камер дээшлэх логик
     platforms.forEach(plat => {
-        if (player.y + player.height > plat.y && 
+        // Мөргөлдөөн шалгах
+        if (player.dy > 0 && 
+            player.y + player.height > plat.y && 
             player.y + player.height < plat.y + plat.height + player.dy &&
             player.x + player.width > plat.x && 
-            player.x < plat.x + plat.width &&
-            player.dy > 0) { // Only collide while falling
+            player.x < plat.x + plat.width) {
             
-            player.dy = player.jumpForce; // Automatic Jump
+            player.y = plat.y - player.height;
+            player.dy = 0;
+            player.onGround = true;
+        }
+
+        // Хэрвээ тоглогч дэлгэцийн гол хэсгээс дээш гарвал
+        if (player.y < canvas.height / 2) {
+            if (player.dy < 0) { // Зөвхөн дээшээ үсэрч байх үед
+                plat.y += Math.abs(player.dy); // Тавцангуудыг доош нь шилжүүлнэ
+            }
+        }
+
+        // Доошоо алга болсон тавцанг дээрээс гаргаж ирэх
+        if (plat.y > canvas.height) {
+            plat.y = 0;
+            plat.x = Math.random() * (canvas.width - plat.width);
             score++;
             document.getElementById("score").innerText = score;
         }
     });
 
-    // Game Over if falls off bottom
-    if (player.y > canvas.height) isGameOver = true;
+    // Хана нэвт гарах (Зүүнээс гарвал баруунаас гарч ирнэ)
+    if (player.x > canvas.width) player.x = 0;
+    if (player.x < -player.width) player.x = canvas.width;
+
+    // Тоглоом дуусах
+    if (player.y > canvas.height) {
+        isGameOver = true;
+    }
 }
 
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Draw Player
-    ctx.fillStyle = "#e67e22"; // Orange Square
+    // Тоглогч зурах
+    ctx.fillStyle = "#e67e22";
     ctx.fillRect(player.x, player.y, player.width, player.height);
 
-    // Draw Platforms
-    ctx.fillStyle = "#27ae60"; // Green Platforms
+    // Тавцангууд зурах
+    ctx.fillStyle = "#27ae60";
     platforms.forEach(plat => {
         ctx.fillRect(plat.x, plat.y, plat.width, plat.height);
     });
 
     if (isGameOver) {
-        ctx.fillStyle = "rgba(0,0,0,0.5)";
-        ctx.fillRect(0,0, canvas.width, canvas.height);
+        ctx.fillStyle = "rgba(0,0,0,0.7)";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.fillStyle = "white";
-        ctx.fillText("GAME OVER - Refresh to Restart", 100, 300);
+        ctx.font = "20px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText("ТОГЛООМ ДУУСЛАА!", canvas.width/2, canvas.height/2);
+        ctx.fillText("F5 дарж дахин эхлүүлнэ үү", canvas.width/2, canvas.height/2 + 40);
     }
 
     requestAnimationFrame(() => {
